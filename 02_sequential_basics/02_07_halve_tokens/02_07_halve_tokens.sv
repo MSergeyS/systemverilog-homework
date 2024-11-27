@@ -19,5 +19,35 @@ module halve_tokens
     // a -> 110_011_101_000_1111
     // b -> 010_001_001_000_0101
 
+    // States
+    typedef enum logic
+    {
+      st_first   = 1'b0,
+      st_second  = 1'b1
+    }  statetype_t;
+    statetype_t state, new_state;
+
+    // State transition logic  (логика переходоа конечного автомата)
+    always_comb
+      begin
+        new_state = state;
+
+        case (state)
+          st_first   : if (a) new_state = st_second;
+          st_second  : if (a) new_state = st_first;
+        endcase
+
+      // verilator lint_on  CASEINCOMPLETE
+      end
+
+    // Output logic (обновление выходов)
+    assign b = a & (state == st_second);
+
+    // обновление состояния
+    always_ff @ (posedge clk)
+      if (rst)
+        state <= st_first;
+      else
+        state <= new_state;
 
 endmodule
