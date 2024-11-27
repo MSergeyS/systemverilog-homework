@@ -30,5 +30,15 @@ module float_discriminant (
     // The FLEN parameter is defined in the "import/preprocessed/cvw/config-shared.vh" file
     // and usually equal to the bit width of the double-precision floating-point number, FP64, 64 bits.
 
+    // Задача:
+    // Реализовать модуль, который принимает три числа с плавающей точкой и выводит их дискриминант.
+    // Результирующее значение res должно быть вычислено как дискриминант квадратичного полинома.
+    // То есть res = b^2 - 4ac == b*b - 4*a*c
+    //
+    // Примечание:
+    // Если какой-либо аргумент не является допустимым числом, то есть NaN или Inf, следует установить флаг "err".
+    //
+    // Параметр FLEN определен в файле "import/preprocessed/cvw/config-shared.vh"
+    // и обычно равен битовой ширине числа с плавающей точкой двойной точности, FP64, 64 бита.
 
 endmodule

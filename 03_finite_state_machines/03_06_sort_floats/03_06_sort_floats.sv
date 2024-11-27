@@ -81,10 +81,68 @@ module sort_three_floats (
     //
     // Notes:
     // res0 must be less or equal to the res1
-    // res1 must be less or equal to the res1
+    // res1 must be less or equal to the res2
     //
     // The FLEN parameter is defined in the "import/preprocessed/cvw/config-shared.vh" file
     // and usually equal to the bit width of the double-precision floating-point number, FP64, 64 bits.
 
+    logic u0_less_or_equal_u1;
+    logic u0_less_or_equal_u2;
+    logic u1_less_or_equal_u2;
+
+    f_less_or_equal i_floe_0
+    (
+        .a   ( unsorted [0]        ),
+        .b   ( unsorted [1]        ),
+        .res ( u0_less_or_equal_u1 ),
+        .err ( err_0               )
+    );
+
+    f_less_or_equal i_floe_1
+    (
+        .a   ( unsorted [0]        ),
+        .b   ( unsorted [2]        ),
+        .res ( u0_less_or_equal_u2 ),
+        .err ( err_1                )
+    );
+
+    f_less_or_equal i_floe_2
+    (
+        .a   ( unsorted [1]        ),
+        .b   ( unsorted [2]        ),
+        .res ( u1_less_or_equal_u2 ),
+        .err ( err_2               )
+    );
+    // старт  a<=b      a<=c     b<=c  финиш
+    // -------------------------------------
+    //                           -1->  012
+    //                  -1-> 0хх
+    //        -1-> 01x           -0->  021
+    //                  -0---------->  201
+    // ххх
+    //                  -1---------->  102
+    //        -0-> 10x           -1->  120
+    //                  -0-> xx0
+    //                           -0->  210
+
+    always_comb
+        if (u0_less_or_equal_u1)
+            if (u0_less_or_equal_u2)
+                if (u1_less_or_equal_u2)
+                    sorted = unsorted;
+                else
+                    sorted = {unsorted [0], unsorted [2], unsorted [1]};
+            else
+                sorted = {unsorted [2], unsorted [0], unsorted [1]};
+        else
+            if (u0_less_or_equal_u2)
+                sorted = {unsorted [1], unsorted [0], unsorted [2]};
+            else
+                if (u1_less_or_equal_u2)
+                    sorted = {unsorted [1], unsorted [2], unsorted [0]};
+                else
+                    sorted = {unsorted [2], unsorted [1], unsorted [0]};
+
+    assign err = err_0 | err_1 | err_2;
 
 endmodule
