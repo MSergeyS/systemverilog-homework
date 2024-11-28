@@ -151,7 +151,7 @@ module testbench;
             // Uncomment the following line
             // to generate a VCD file and analyze it using GTKwave
 
-            // $dumpvars;
+            $dumpvars;
         `endif
 
         run ();
@@ -256,7 +256,7 @@ module testbench;
                         $display ("FAIL %s: res mismatch. Expected %s, actual %s",
                             test_id, `PG_BITS (res_expected), `PG_BITS (res) );
 
-                        $finish;
+                        //$finish;
                     end
                 end
             end
