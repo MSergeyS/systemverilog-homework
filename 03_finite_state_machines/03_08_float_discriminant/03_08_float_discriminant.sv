@@ -35,20 +35,20 @@ module float_discriminant (
     // Результирующее значение res должно быть вычислено как дискриминант квадратичного полинома.
     // То есть res = b^2 - 4ac == b*b - 4*a*c
     //
-    // Примечание:
+    // Примечание:state != st_ready
     // Если какой-либо аргумент не является допустимым числом, то есть NaN или Inf, следует установить флаг "err".
     //
     // Параметр FLEN определен в файле "import/preprocessed/cvw/config-shared.vh"
     // и обычно равен битовой ширине числа с плавающей точкой двойной точности, FP64, 64 бита.
 
-logic [FLEN - 1:0] mult_a;
-logic [FLEN - 1:0] mult_b;
-logic              mult_arg_vld;
-logic [FLEN - 1:0] mult_res;
-logic              mult_res_vld;
-logic              mult_busy;
-logic              mult_err;
-
+    // умножитель (float)
+    logic [FLEN - 1:0] mult_a;
+    logic [FLEN - 1:0] mult_b;
+    logic              mult_arg_vld;
+    logic [FLEN - 1:0] mult_res;
+    logic              mult_res_vld;
+    logic              mult_busy;
+    logic              mult_err;
 
     f_mult i_mult (
             .clk(clk),
@@ -62,28 +62,51 @@ logic              mult_err;
             .error(mult_err)
     );
 
+    // вычитатель (float)
+    logic [FLEN - 1:0] sub_a;
+    logic [FLEN - 1:0] sub_b;
+    logic              sub_arg_vld;
+    logic [FLEN - 1:0] sub_res;
+    logic              sub_res_vld;
+    logic              sub_busy;
+    logic              sub_err;
+
+    f_sub i_sub (
+            .clk(clk),
+            .rst(rst),
+            .a(sub_a),
+            .b(sub_b),
+            .up_valid(sub_arg_vld),
+            .res(sub_res),
+            .down_valid(sub_res_vld),
+            .busy(sub_busy),
+            .error(sub_err)
+    );
+
     // FSM (finite state machine) ----------------------------------------------
-    // стop   arg_vld
-    // -------------------------------------
-    // stop    -1->    b*b   --->   a*c   --->  subtraction  --> ready --
-    //                                                                  |
-    //         <---------------------------------------------------------
+    // стop  arg_vld     mult_res_vld    mult_res_vld   mult_res_vld     sub_res_vld
+    // -------------------------------------------------------------------------------
+    // stop    -1->   b*b    -1->    a*c   -1->   4*a*c   -1->  subtraction  -1-> ready --
+    //                                                                                   |
+    //         <--------------------------------------------------------------------------
 
     // States
     typedef enum logic [2:0]
     {
         st_stop  = 3'd0,
         st_bb    = 3'd1,
-        st_4ac   = 3'd2,
-        st_sub   = 3'd3,
-        st_ready = 3'd4
+        st_ac    = 3'd2,
+        st_4ac   = 3'd3,
+        st_sub   = 3'd4,
+        st_ready = 3'd5
 
     } statetype_t;
     statetype_t state, next_state;
 
     //------------------------------------------------------------------------
-    // Next state and isqrt interface
+    // Next state and isqrt st_stopinterface
 
+    
     always_comb
     begin
         next_state  = state;
@@ -93,60 +116,69 @@ logic              mult_err;
 
         case (state)
             st_stop  : if (arg_vld) next_state = st_bb;
-            st_bb    : next_state = st_4ac;
-            st_4ac   : next_state = st_sub;
-            st_sub   : next_state = st_ready;
+            st_bb    : if (mult_res_vld) next_state = st_ac;
+            st_ac    : if (mult_res_vld) next_state = st_4ac;
+            st_4ac   : if (mult_res_vld) next_state = st_sub;
+            st_sub   : if (sub_res_vld) next_state = st_ready;
             st_ready : next_state = st_stop;
         endcase
 
         // verilator lint_on  CASEINCOMPLETE
-
     end
 
-    //------------------------------------------------------------------------
-    assign mult_a = ( state == st_stop ) ? b : a;
-    assign mult_b = ( state == st_bb ) ? b : c;
-
-    // Output logic ---------------------------------------------------------
     always_comb
     begin
         case (state)
-            st_01x : sorted = (f_le_res) ?
-                     {(3*FLEN){1'bx}} :
-                     {unsorted[2], unsorted[0], unsorted[1]};
-            st_10x : sorted = (f_le_res) ?
-                     {unsorted[1], unsorted[0], unsorted[2]} :
-                     {(3*FLEN){1'bx}};
-            st_0xx : sorted = (f_le_res) ?
-                     unsorted :
-                     {unsorted[0], unsorted[2], unsorted[1]};
-            st_xx0 : sorted = (f_le_res) ?
-                     {unsorted[1], unsorted[2], unsorted[0]} :
-                     {unsorted[2], unsorted[1], unsorted[0]};
-            st_xxx : sorted = {(3*FLEN){1'bx}};
+            st_stop :
+                begin
+                    mult_a = b;
+                    mult_b = b;
+                end
+            st_bb : 
+                begin
+                    mult_a = a;
+                    mult_b = c;
+                    if (mult_res_vld) sub_a = mult_res;
+                end
+            st_ac : 
+                begin
+                    mult_a = $realtobits ( 4 );
+                    mult_b = mult_res;
+                    
+                end
+            st_4ac : if (mult_res_vld) sub_b = mult_res;
         endcase
-
-        // verilator lint_on  CASEINCOMPLETE
-
     end
+
+    assign mult_arg_vld = (state == st_stop) ? 
+                          arg_vld : 
+                          ( ( (state == st_bb) | (state == st_ac) ) ?
+                          mult_res_vld : 1'b0);
+    assign sub_arg_vld = ( (next_state == st_sub) ) ?  mult_res_vld : 1'b0;
+
+    // Output logic ---------------------------------------------------------
+    assign res = sub_res;
+    assign res_vld = (state == st_ready);
+    assign busy = ( (state != st_ready) & (state != st_stop) );
 
     always_ff @ (posedge clk)
         if (rst)
-            valid_out <= 1'b0;
+            err <= 1'b0;
         else
             begin
-                valid_out <= (next_state == st_stop);
-                err <= (state == st_xxx) ? 1'b0 : (err ? 1'b1 : f_le_err);
+                err <= (state == st_stop) ?
+                   1'b0 : 
+                   (err ?
+                        1'b1 :
+                        ( ( (state == st_bb) | (state == st_ac) | (state == st_4ac) ) & mult_err & mult_res_vld | ((state == st_sub) & sub_err & sub_res_vld)) );
             end
-
-    assign busy = (state != st_xxx);
 
     //------------------------------------------------------------------------
     // Assigning next state
 
     always_ff @ (posedge clk)
         if (rst)
-            state <= st_xxx;
+            state <= st_stop;
         else
             state <= next_state;
 
