@@ -86,9 +86,9 @@ module float_discriminant (
     // FSM (finite state machine) ----------------------------------------------
     // стop  arg_vld     mult_res_vld    mult_res_vld   mult_res_vld     sub_res_vld
     // -------------------------------------------------------------------------------
-    // stop    -1->   b*b    -1->    a*c   -1->   4*a*c   -1->  subtraction  -1-> ready --
-    //                                                                                   |
-    //         <--------------------------------------------------------------------------
+    // stop    -1->   b*b    -1->    a*c   -1->   4*a*c   -1->  subtraction  --
+    //                                                                        |
+    //         <---------------------------------------------------------------
 
     // States
     typedef enum logic [2:0]
@@ -97,16 +97,13 @@ module float_discriminant (
         st_bb    = 3'd1,
         st_ac    = 3'd2,
         st_4ac   = 3'd3,
-        st_sub   = 3'd4,
-        st_ready = 3'd5
-
+        st_sub   = 3'd4
     } statetype_t;
     statetype_t state, next_state;
 
     //------------------------------------------------------------------------
     // Next state and isqrt st_stopinterface
 
-    
     always_comb
     begin
         next_state  = state;
@@ -119,58 +116,58 @@ module float_discriminant (
             st_bb    : if (mult_res_vld) next_state = st_ac;
             st_ac    : if (mult_res_vld) next_state = st_4ac;
             st_4ac   : if (mult_res_vld) next_state = st_sub;
-            st_sub   : if (sub_res_vld) next_state = st_ready;
-            st_ready : next_state = st_stop;
+            st_sub   : if (sub_res_vld) next_state = st_stop;
         endcase
 
         // verilator lint_on  CASEINCOMPLETE
     end
 
     always_comb
-    begin
+        begin
+        mult_arg_vld = 1'b0;
+        sub_arg_vld = 1'b0;
+
         case (state)
             st_stop :
                 begin
                     mult_a = b;
                     mult_b = b;
+                    mult_arg_vld = arg_vld;
                 end
-            st_bb : 
+            st_bb :
                 begin
                     mult_a = a;
                     mult_b = c;
+                    mult_arg_vld = mult_res_vld;
                     if (mult_res_vld) sub_a = mult_res;
                 end
-            st_ac : 
+            st_ac :
                 begin
                     mult_a = $realtobits ( 4 );
                     mult_b = mult_res;
-                    
+                    mult_arg_vld = mult_res_vld;
                 end
-            st_4ac : if (mult_res_vld) sub_b = mult_res;
+            st_4ac :
+                begin
+                    if (mult_res_vld) sub_b = mult_res;
+                    sub_arg_vld = mult_res_vld;
+                end
         endcase
     end
 
-    assign mult_arg_vld = (state == st_stop) ? 
-                          arg_vld : 
-                          ( ( (state == st_bb) | (state == st_ac) ) ?
-                          mult_res_vld : 1'b0);
-    assign sub_arg_vld = ( (next_state == st_sub) ) ?  mult_res_vld : 1'b0;
-
     // Output logic ---------------------------------------------------------
     assign res = sub_res;
-    assign res_vld = (state == st_ready);
-    assign busy = ( (state != st_ready) & (state != st_stop) );
+    assign res_vld = sub_res_vld;
+    assign busy = (state != st_stop);
+
+    assign mult_err_vld = mult_err & mult_res_vld;
+    assign sub_err_vld = sub_err & sub_res_vld;
 
     always_ff @ (posedge clk)
-        if (rst)
-            err <= 1'b0;
-        else
-            begin
-                err <= (state == st_stop) ?
-                   1'b0 : 
-                   (err ?
-                        1'b1 :
-                        ( ( (state == st_bb) | (state == st_ac) | (state == st_4ac) ) & mult_err & mult_res_vld | ((state == st_sub) & sub_err & sub_res_vld)) );
+        begin
+            err <= (state == st_stop) ?
+                1'b0 :        // сбрасываем
+                (err ? 1'b1 : ( mult_err_vld | sub_err_vld ) );
             end
 
     //------------------------------------------------------------------------
