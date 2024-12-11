@@ -301,6 +301,31 @@ module testbench;
 
     logic was_reset = 0;
 
+    //--------------------------------------------------------------------------
+
+    function farr_eq3 (input [0:2][FLEN - 1:0] arr_a, arr_b);
+
+        logic [FLEN - 1:0] a, b;
+        logic both_zeros;
+
+        for (int i = 0; i < $size (arr_a); i ++)
+        begin
+            a = arr_a [i];
+            b = arr_b [i];
+
+            both_zeros =    { a [FLEN - 2:0] , b [FLEN - 2:0] } === '0
+                         && ( a [FLEN - 1  ] ^ b [FLEN - 1  ] ) !== 'x;
+
+            if (a !== b && ! both_zeros)
+                return 0;
+        end
+
+        return 1;
+
+    endfunction
+
+    //--------------------------------------------------------------------------
+
     // Blocking assignments are okay in this synchronous always block, because
     // data is passed using queue and all the checks are inside that always
     // block, so no race condition is possible
@@ -354,7 +379,8 @@ module testbench;
 
                         $finish;
                     end
-                    else if ( (err_expected === 1'b0) && (res !== res_expected) )
+                    else if (   (err_expected === 1'b0)
+                             && ! farr_eq3 (res, res_expected))
                     begin
                         $display ("FAIL %s: res mismatch. Expected %s, actual %s",
                             test_id, format_result (res_expected), format_result (res) );
