@@ -32,5 +32,12 @@ module mux_4_1
   // Using code for mux_2_1 as an example,
   // write code for 4:1 mux using the "case" statement
 
+  always_comb
+    unique case (sel) //unique - чтобы проверялось, что заданы все возможные комбинации в ключе case
+      2'd00: y = d0;
+      2'd01: y = d1;
+      2'd10: y = d2;
+      2'd11: y = d3;
+    endcase
 
 endmodule
