@@ -46,7 +46,7 @@ module formula_1_impl_2_fsm
     typedef enum logic [1:0]
     {
         st_idle         = 2'b0,
-        st_wait_a_b_res = 2'd1,
+        st_wait_ab_res = 2'd1,
         st_wait_c_res   = 2'd2
     } statetype_t;
     statetype_t state, next_state;
@@ -75,7 +75,7 @@ module formula_1_impl_2_fsm
             if (arg_vld)
             begin
                 isqrt_1_x_vld = '1;
-                next_state  = st_wait_a_b_res;
+                next_state  = st_wait_ab_res;
             end
 
             isqrt_2_x = b;
@@ -83,11 +83,11 @@ module formula_1_impl_2_fsm
             if (arg_vld)
             begin
                 isqrt_2_x_vld = '1;
-                next_state  = st_wait_a_b_res;
+                next_state  = st_wait_ab_res;
             end
         end
 
-        st_wait_a_b_res:
+        st_wait_ab_res:
         begin
             isqrt_1_x = c;
 
@@ -135,7 +135,7 @@ module formula_1_impl_2_fsm
         else begin
             if (isqrt_1_y_vld | isqrt_2_y_vld)
             begin
-              if (state == st_wait_a_b_res)
+              if (state == st_wait_ab_res)
                 res <= res + 32' (isqrt_1_y) + 32' (isqrt_2_y);
               else
                 res <= res + 32' (isqrt_1_y);
@@ -143,3 +143,110 @@ module formula_1_impl_2_fsm
         end
 
 endmodule
+
+// //------------------------------------------------------------------------
+// // авторское решение
+// //------------------------------------------------------------------------
+// // States
+// enum logic [1:0]
+// {
+//     st_idle         = 2'b0,
+//     st_wait_ab_res = 2'd1,
+//     st_wait_c_res   = 2'd2
+// }
+// state, next_state;
+
+// //------------------------------------------------------------------------
+// // Next state and isqrt interface
+
+// always_comb
+// begin
+//     next_state  = state;
+
+//     isqrt_1_x_vld = '0;
+//     isqrt_1_x     = 'x;  // Don't care
+
+//     isqrt_2_x_vld = '0;
+//     isqrt_2_x     = 'x;  // Don't care
+
+//     // This lint warning is bogus because we assign the default value above
+//     // verilator lint_off CASEINCOMPLETE
+
+//     case (state)
+//         st_idle:
+//         begin
+//             isqrt_1_x = a;
+//             isqrt_2_x = b;
+
+//             if (arg_vld)
+//             begin
+//                 isqrt_1_x_vld = '1;
+//                 isqrt_2_x_vld = '1;
+//                 next_state  = st_wait_ab_res;
+//             end
+//         end
+
+//         st_wait_ab_res:
+//         begin
+//             isqrt_1_x = c;
+
+//             if (isqrt_1_y_vld & isqrt_2_y_vld)
+//             begin
+//                 isqrt_1_x_vld = '1;
+//                 next_state  = st_wait_c_res;
+//             end
+//         end
+
+//         st_wait_c_res:
+//         begin
+//             if (isqrt_1_y_vld)
+//             begin
+//                 next_state = st_idle;
+//             end
+//         end
+//         endcase
+
+//         // verilator lint_on  CASEINCOMPLETE
+
+//     end
+
+//     //------------------------------------------------------------------------
+//     // Assigning next state
+
+//     always_ff @ (posedge clk)
+//         if (rst)
+//             state <= st_idle;
+//         else
+//             state <= next_state;
+
+//     //------------------------------------------------------------------------
+//     // Accumulating the result
+
+//     always_ff @ (posedge clk)
+//         if (rst)
+//             res_vld <= '0;
+//         else
+//             res_vld <= (state == st_wait_c_res & isqrt_1_y_vld);
+
+//     logic [31:0] res_d;
+
+//     always_comb
+//     begin
+//         res_d = res;
+
+//         if (isqrt_1_y_vld)
+//             res_d += 32'(isqrt_1_y);
+
+//         if (isqrt_2_y_vld)
+//             res_d += 32'(isqrt_2_y);
+//     end
+
+//     always_ff @ (posedge clk)
+//         if (state == st_idle)
+//             res <= '0;
+//         else if (isqrt_1_y_vld) // Should be the same as isqrt_2_y_vld
+//             res <= res_d;
+
+//     // END_SOLUTION
+
+// endmodule

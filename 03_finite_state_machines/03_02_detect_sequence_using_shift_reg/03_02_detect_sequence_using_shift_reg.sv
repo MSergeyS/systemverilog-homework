@@ -44,12 +44,13 @@ module detect_6_bit_sequence_using_shift_reg
 
   logic [5:0] shift_reg;
 
-  assign detected =   shift_reg[5] &
-                      shift_reg[4] &
-                    ~ shift_reg[3] &
-                    ~ shift_reg[2] &
-                      shift_reg[1] &
-                      shift_reg[0];
+  // assign detected =   shift_reg[5] &
+  //                     shift_reg[4] &
+  //                   ~ shift_reg[3] &
+  //                   ~ shift_reg[2] &
+  //                     shift_reg[1] &
+  //                     shift_reg[0];
+  assign detected = (shift_reg == 6'b110011); // так было в разборе решений
 
   always_ff @ (posedge clk)
     if (rst)

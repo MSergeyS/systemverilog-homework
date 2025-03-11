@@ -111,6 +111,7 @@ module detect_6_bit_sequence_using_fsm
                 else     new_state = IDLE;
       Sixth_1:  if (  a) new_state = Second_1;
                 else     new_state = Third_0;
+      // default:  new_state = state; // можно написать и так вместо 96 строки - это просто стиль написания
     endcase
 
     // verilator lint_on CASEINCOMPLETE
